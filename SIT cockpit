@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIT系统接入轮次管理视图</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f0f4f0;
+            --bg-secondary: #ffffff;
+            --bg-accent: #d4ebe4;
+            --bg-dark: #1a1a1a;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07);
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 10px;
+            --color-refactor: #3b82f6;
+            --color-new: #10b981;
+            --color-plan: #f59e0b;
+            --color-cooperate: #8b5cf6;
+            --color-pending: #6b7280;
+            --color-service: #06b6d4;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 32px 40px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+        }
+
+        .header-title h1 {
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #e5e7eb;
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .toggle-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .toggle-btn.active {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 导入按钮 */
+        .upload-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--text-primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-md);
+        }
+
+        .upload-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* 数据视图样式 */
+        .stats-overview { margin-bottom: 24px; }
+        .stats-main-card { background: var(--bg-accent); border-radius: var(--radius-lg); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 40px; }
+        .stats-left { flex: 0 0 auto; min-width: 300px; }
+        .stats-right { flex: 1; max-width: 700px; }
+        .stats-main-card .card-label { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+        
+        .strategy-chart { 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: space-around; 
+            height: 160px;
+            gap: 16px; 
+            padding-top: 10px;
+        }
+        
+        .strategy-bar { 
+            flex: 1; 
+            height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-end; 
+            gap: 6px; 
+            cursor: pointer; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        
+        .strategy-bar:hover { 
+            transform: translateY(-4px) !important; 
+            filter: brightness(0.9); 
+        }
+
+        .strategy-bar-track {
+            width: 100%;
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        
+        .strategy-bar-fill { 
+            width: 100%; 
+            max-width: 36px;
+            border-radius: 4px 4px 0 0; 
+            transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.06); 
+        }
+        
+        .strategy-bar-label { font-size: 12px; color: var(--text-secondary); text-align: center; white-space: nowrap; font-weight: 500; }
+        .strategy-bar-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+        .stats-bottom { display: flex; gap: 48px; margin-top: 32px; }
+        .stats-bottom-item { text-align: left; }
+        .stats-bottom-item .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+        .stats-bottom-item .value { font-size: 24px; font-weight: 700; }
+        .stats-bottom-item .value span { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+        
+        /* 筛选区 */
+        .filter-section { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 24px; }
+        .filter-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .filter-group { display: flex; align-items: center; gap: 10px; }
+        .filter-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+        .filter-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-tag { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border-color); background: white; color: var(--text-secondary); user-select: none; }
+        .filter-tag:hover { border-color: var(--text-primary); color: var(--text-primary); }
+        .filter-tag.active { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+        .filter-tag.refactor.active { background: var(--color-refactor); border-color: var(--color-refactor); }
+        .filter-tag.new.active { background: var(--color-new); border-color: var(--color-new); }
+        .filter-tag.plan.active { background: var(--color-plan); border-color: var(--color-plan); }
+        .filter-tag.cooperate.active { background: var(--color-cooperate); border-color: var(--color-cooperate); }
+        .filter-tag.pending.active { background: var(--color-pending); border-color: var(--color-pending); }
+        .filter-tag.service.active { background: var(--color-service); border-color: var(--color-service); }
+        
+        /* 更新：高度对比增强的展示模式单选切换 */
+        .display-mode-switch {
+            display: flex;
+            background: #f4f5f7;
+            border-radius: 8px;
+            padding: 4px;
+            margin-left: 12px;
+            gap: 4px;
+        }
+        .display-mode-switch label {
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+            user-select: none;
+        }
+        .display-mode-switch input[type="radio"] {
+            display: none;
+        }
+        .display-mode-switch input[type="radio"]:checked + label {
+            background: var(--text-primary);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .filter-select { position: relative; }
+        .filter-select-btn { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border-color); background: white; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+        .filter-select-btn:hover { border-color: var(--text-primary); color: var(--text-primary); }
+        .filter-dropdown { position: absolute; top: 100%; left: 0; margin-top: 8px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); padding: 8px; min-width: 200px; max-height: 300px; overflow-y: auto; z-index: 100; display: none; }
+        .filter-dropdown.show { display: block; }
+        .filter-dropdown-item { padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .filter-dropdown-item:hover { background: var(--bg-primary); }
+        
+        /* 调整清空按钮外观，移除右侧对齐 */
+        .clear-btn { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: var(--text-primary); color: white; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-left: auto; }
+        .clear-btn:hover { opacity: 0.85; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+        
+        .matrix-section { column-count: 3; column-gap: 20px; }
+        .round-card { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 20px; transition: all 0.3s; break-inside: avoid; margin-bottom: 20px; display: inline-block; width: 100%; }
+        .round-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .round-title { font-size: 16px; font-weight: 600; }
+        .round-count { background: var(--bg-primary); padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        
+        .system-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+        .system-card { padding: 8px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; position: relative; background: var(--bg-primary); border-left: 3px solid var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .system-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); background: white; }
+        .system-card.refactor { border-left-color: var(--color-refactor); }
+        .system-card.new { border-left-color: var(--color-new); }
+        .system-card.plan { border-left-color: var(--color-plan); }
+        .system-card.cooperate { border-left-color: var(--color-cooperate); }
+        .system-card.pending { border-left-color: var(--color-pending); }
+        .system-card.service { border-left-color: var(--color-service); }
+        .system-card .system-name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-tertiary); }
+        .empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state p { font-size: 13px; }
+
+        /* 表单视图样式 */
+        .form-view-container { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; animation: fadeIn 0.3s ease; }
+        .form-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .search-box input { padding: 10px 16px; border: 1px solid var(--border-color); border-radius: 12px; width: 320px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .search-box input:focus { border-color: var(--text-primary); }
+        .add-row-btn { padding: 10px 20px; background: var(--text-primary); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+        .add-row-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); max-height: 600px; }
+        
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+        .data-table th { background: #f8fafc; color: var(--text-secondary); font-weight: 600; padding: 14px 16px; text-align: left; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border-color); }
+        .data-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+        .data-table tr:hover { background: rgba(0,0,0,0.02); }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table input.edit-input { width: 100%; padding: 8px 10px; border: 1px solid #3b82f6; border-radius: 6px; font-size: 13px; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
+        
+        .row-action-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border-color); background: white; margin-right: 6px; transition: all 0.2s; }
+        .row-action-btn.edit { color: var(--color-refactor); border-color: #bfdbfe; background: #eff6ff; }
+        .row-action-btn.delete { color: #ef4444; border-color: #fecaca; background: #fef2f2; }
+        .row-action-btn.save { color: white; background: var(--color-new); border-color: var(--color-new); }
+        .row-action-btn.cancel { color: var(--text-secondary); background: var(--bg-primary); }
+        .row-action-btn:hover { filter: brightness(0.95); }
+
+        /* 排序支持样式 */
+        .sortable { cursor: pointer; user-select: none; transition: background 0.2s; }
+        .sortable:hover { background: #e2e8f0; color: var(--text-primary); }
+        .sort-icon { font-size: 11px; color: #9ca3af; margin-left: 4px; display: inline-block; width: 12px; text-align: center; }
+        .sort-icon.active { color: var(--text-primary); font-weight: bold; }
+
+        /* 多选框支持样式 */
+        .multi-select-container { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; min-width: 240px; }
+        .multi-select-label { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; background: white; padding: 2px 6px; border-radius: 4px; border: 1px solid #e5e7eb; user-select: none; }
+        .multi-select-label:hover { border-color: #3b82f6; }
+
+        /* 浮层组件 */
+        .tooltip { position: fixed; background: var(--text-primary); color: white; padding: 12px 16px; border-radius: 10px; font-size: 12px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.2s; max-width: 280px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+        .tooltip.show { opacity: 1; }
+        .tooltip-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+        .tooltip-label { color: rgba(255,255,255,0.6); white-space: nowrap; }
+        .tooltip-value { font-weight: 500; text-align: right; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: white; border-radius: 24px; padding: 32px; max-width: 480px; width: 90%; position: relative; }
+        .modal-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--bg-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-secondary); }
+        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+        .modal-detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+        .modal-detail-label { color: var(--text-secondary); font-size: 13px; }
+        .modal-detail-value { font-weight: 500; font-size: 13px; text-align: right; }
+        
+        /* 拖拽上传提示层 */
+        .upload-hint { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(4px); }
+        .upload-hint.show { display: flex; }
+        .upload-hint-box { background: white; border-radius: 24px; padding: 60px; text-align: center; border: 4px dashed var(--border-color); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .upload-hint-box.dragover { border-color: var(--text-primary); background: #f8fafc; transform: scale(1.02); transition: all 0.2s; }
+        .upload-hint-box svg { width: 64px; height: 64px; margin-bottom: 16px; color: var(--text-primary); opacity: 0.8; }
+        .upload-hint-box h3 { font-size: 20px; margin-bottom: 8px; color: var(--text-primary); font-weight: 600; }
+        .upload-hint-box p { color: var(--text-secondary); font-size: 14px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">
+                <h1>测试管理驾驶舱</h1>
+            </div>
+            <div class="header-actions">
+                <div class="view-toggle">
+                    <button class="toggle-btn active" id="btnDataView" onclick="switchView('data')">数据视图</button>
+                    <button class="toggle-btn" id="btnFormView" onclick="switchView('form')">表单视图</button>
+                </div>
+                <label for="fileInput" class="upload-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    导入完整 Excel
+                </label>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileUpload(event)">
+            </div>
+        </div>
+
+        <!-- ==================== 数据视图容器 ==================== -->
+        <div id="dataViewContainer">
+            <div class="stats-overview">
+                <div class="stats-main-card">
+                    <div class="stats-left">
+                        <div class="card-label">数据总览</div>
+                        <div class="stats-bottom">
+                            <div class="stats-bottom-item">
+                                <div class="label">系统总数</div>
+                                <div class="value" id="totalSystems">0 <span>个</span></div>
+                            </div>
+                            <div class="stats-bottom-item">
+                                <div class="label">SIT轮次</div>
+                                <div class="value" id="totalRounds">0 <span>轮</span></div>
+                            </div>
+                            <div class="stats-bottom-item">
+                                <div class="label">PMO跟踪</div>
+                                <div class="value" id="totalPMOs">0 <span>人</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stats-right">
+                        <div class="strategy-chart" id="strategyChart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <!-- 第一行：查看方式 -->
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <span class="filter-label"><b>查看方式：</b></span>
+                        <div class="display-mode-switch">
+                            <input type="radio" id="mode_all" name="display_mode" value="all" checked onchange="handleDisplayModeChange()">
+                            <label for="mode_all">全部接入</label>
+                            <input type="radio" id="mode_first" name="display_mode" value="first" onchange="handleDisplayModeChange()">
+                            <label for="mode_first">仅看首轮接入</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第二行：实施策略 -->
+                <div class="filter-row" style="margin-top: 16px;">
+                    <div class="filter-group">
+                        <span class="filter-label"><b>实施策略：</b></span>
+                        <div class="filter-tags" id="strategyFilters">
+                            <span class="filter-tag refactor" data-strategy="重构" onclick="toggleFilter('strategy', '重构', this)">重构</span>
+                            <span class="filter-tag new" data-strategy="新建" onclick="toggleFilter('strategy', '新建', this)">新建</span>
+                            <span class="filter-tag plan" data-strategy="拟新建" onclick="toggleFilter('strategy', '拟新建', this)">拟新建</span>
+                            <span class="filter-tag cooperate" data-strategy="配合改造" onclick="toggleFilter('strategy', '配合改造', this)">配合改造</span>
+                            <span class="filter-tag pending" data-strategy="待定" onclick="toggleFilter('strategy', '待定', this)">待定</span>
+                            <span class="filter-tag service" data-strategy="服务类" onclick="toggleFilter('strategy', '服务类', this)">服务类</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三行：接入轮次 -->
+                <div class="filter-row" style="margin-top: 16px;">
+                    <div class="filter-group">
+                        <span class="filter-label"><b>SIT 接入轮次：</b></span>
+                        <div class="filter-tags" id="roundFilters"></div>
+                    </div>
+                </div>
+
+                <!-- 第四行：PMO跟踪人 + 清空按钮 -->
+                <div class="filter-row" style="margin-top: 16px;">
+                    <div class="filter-group">
+                        <span class="filter-label"><b>PMO跟踪人：</b></span>
+                        <div class="filter-select">
+                            <button class="filter-select-btn" onclick="togglePMODropdown()">
+                                <span id="pmoSelectedText">全部</span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </button>
+                            <div class="filter-dropdown" id="pmoDropdown"></div>
+                        </div>
+                    </div>
+                    <!-- 清空筛选按钮紧跟在 PMO 下拉框后面 -->
+                    <button class="clear-btn" onclick="clearAllFilters()">清空筛选</button>
+                </div>
+            </div>
+
+            <div class="matrix-section" id="matrixSection"></div>
+        </div>
+
+        <!-- ==================== 表单视图容器 ==================== -->
+        <div id="formViewContainer" class="form-view-container" style="display: none;">
+            <div class="form-header-bar">
+                <div class="search-box">
+                    <input type="text" id="tableSearchInput" placeholder="搜索系统编号或名称..." oninput="handleTableSearch()">
+                </div>
+                <div>
+                    <span style="font-size: 13px; color: var(--text-tertiary); margin-right: 16px;" id="tableDataCount"></span>
+                    <button class="add-row-btn" onclick="addNewRow()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        新增一行
+                    </button>
+                </div>
+            </div>
+            
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th width="8%" class="sortable" onclick="handleSort('批次')">批次 <span class="sort-icon" id="sort_batch">↕</span></th>
+                            <th width="10%" class="sortable" onclick="handleSort('序号')">序号 <span class="sort-icon" id="sort_id">↕</span></th>
+                            <th width="16%" class="sortable" onclick="handleSort('系统名称')">系统名称 <span class="sort-icon" id="sort_name">↕</span></th>
+                            <th width="10%" class="sortable" onclick="handleSort('实施策略')">实施策略 <span class="sort-icon" id="sort_strategy">↕</span></th>
+                            <th width="12%" class="sortable" onclick="handleSort('PMO跟踪人')">PMO跟踪人 <span class="sort-icon" id="sort_pmo">↕</span></th>
+                            <th width="14%" class="sortable" onclick="handleSort('接入轮次')">接入轮次 <span class="sort-icon" id="sort_round">↕</span></th>
+                            <th width="10%" class="sortable" onclick="handleSort('系统类型')">系统类型 <span class="sort-icon" id="sort_type">↕</span></th>
+                            <th width="10%" class="sortable" onclick="handleSort('送测方式')">送测方式 <span class="sort-icon" id="sort_delivery">↕</span></th>
+                            <th width="10%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="formTableBody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 浮层与模态框 -->
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-row"><span class="tooltip-label">系统编号</span><span class="tooltip-value" id="tooltipId">-</span></div>
+        <div class="tooltip-row"><span class="tooltip-label">实施策略</span><span class="tooltip-value" id="tooltipStrategy">-</span></div>
+        <div class="tooltip-row"><span class="tooltip-label">PMO跟踪人</span><span class="tooltip-value" id="tooltipPMO">-</span></div>
+        <div class="tooltip-row"><span class="tooltip-label">系统类型</span><span class="tooltip-value" id="tooltipType">-</span></div>
+        <div class="tooltip-row"><span class="tooltip-label">接入轮次</span><span class="tooltip-value" id="tooltipRound">-</span></div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div class="modal-title" id="modalTitle">系统详情</div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <div class="upload-hint" id="uploadHint">
+        <div class="upload-hint-box" id="uploadHintBox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>松开鼠标，立即装入完整 Excel</h3>
+            <p>支持 .xlsx / .xls 格式自动解析覆盖</p>
+        </div>
+    </div>
+
+    <script>
+        const defaultData = [
+            {"批次": 2, "序号": "XYD-001", "系统名称": "新一代柜面系统", "实施策略": "重构", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "部分送测"},
+            {"批次": 2, "序号": "XYD-002", "系统名称": "新一代核心业务系统", "实施策略": "重构", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-003", "系统名称": "新一代企业级客户信息管理系统", "实施策略": "重构", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "部分送测"},
+            {"批次": 2, "序号": "XYD-004", "系统名称": "新一代柜面无纸化", "实施策略": "重构", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-005", "系统名称": "新一代统一支付平台", "实施策略": "重构", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "部分送测"},
+            {"批次": 2, "序号": "XYD-006", "系统名称": "新一代传统银联系统", "实施策略": "重构", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-007", "系统名称": "新一代银联无卡快捷", "实施策略": "重构", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-008", "系统名称": "新一代网联系统", "实施策略": "重构", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-009", "系统名称": "新一代个人网银系统", "实施策略": "重构", "PMO跟踪人": "彭帅达, 张慧", "接入轮次": "56", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-010", "系统名称": "新一代企业网银系统", "实施策略": "重构", "PMO跟踪人": "彭帅达, 张慧, 郭立杰", "接入轮次": "34", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-011", "系统名称": "新一代综合报表平台", "实施策略": "重构", "PMO跟踪人": "佟鹏飞", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-012", "系统名称": "新一代数据仓库", "实施策略": "重构", "PMO跟踪人": "佟鹏飞", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-013", "系统名称": "新一代EAST5.0", "实施策略": "重构", "PMO跟踪人": "佟鹏飞", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-014", "系统名称": "新一代资金管理系统（外币）", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-079", "系统名称": "资金管理系统（本币）", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-015", "系统名称": "新一代电子验印系统", "实施策略": "重构", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-016", "系统名称": "新一代智慧柜台系统", "实施策略": "重构", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-017", "系统名称": "运营管理中台", "实施策略": "新建", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 1, "序号": "XYD-018", "系统名称": "数据质量平台", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-020", "系统名称": "会计凭证电子化平台", "实施策略": "新建", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-021", "系统名称": "移动厅堂", "实施策略": "新建", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-023", "系统名称": "交易级总账系统", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-024", "系统名称": "供应链系统", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "34", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-025", "系统名称": "零售财富CRM系统", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "SIT 回归", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-026", "系统名称": "零售零贷CRM系统", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "SIT 回归", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-027", "系统名称": "对公CRM系统", "实施策略": "新建", "PMO跟踪人": "郭立杰", "接入轮次": "SIT 回归", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-028", "系统名称": "信贷核算", "实施策略": "新建", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-029", "系统名称": "实时数据平台", "实施策略": "新建", "PMO跟踪人": "佟鹏飞", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 3, "序号": "XYD-030", "系统名称": "机器学习平台", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-031", "系统名称": "绩效考核系统", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-032", "系统名称": "管理会计", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-033", "系统名称": "新资本协议", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-034", "系统名称": "机器人流程自动化系统", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "待确认", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-035", "系统名称": "SQL审核平台", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "待确认", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-036", "系统名称": "远程银行", "实施策略": "拟新建", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 2, "序号": "XYD-037", "系统名称": "排队系统", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-038", "系统名称": "智能客服", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-039", "系统名称": "渠道整合平台", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-040", "系统名称": "公务卡", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-041", "系统名称": "IC卡系统", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-042", "系统名称": "反电诈监测系统", "实施策略": "配合改造", "PMO跟踪人": "佟鹏飞", "接入轮次": "234", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-043", "系统名称": "二代反假币", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "234", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-044", "系统名称": "监管报送平台", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-045", "系统名称": "存款保险同一存款人", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-046", "系统名称": "二代征信报送", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-047", "系统名称": "反洗钱系统", "实施策略": "配合改造", "PMO跟踪人": "佟鹏飞", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-048", "系统名称": "一表通报送系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-049", "系统名称": "财政新非税", "实施策略": "配合改造", "PMO跟踪人": "秦潇", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-050", "系统名称": "银企对账", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-051", "系统名称": "企业账户管理", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "34", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-052", "系统名称": "财政预算管理一体化", "实施策略": "配合改造", "PMO跟踪人": "秦潇", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-053", "系统名称": "中间业务平台", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-054", "系统名称": "事后监督系统", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-055", "系统名称": "财务系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-056", "系统名称": "国际结算系统", "实施策略": "配合改造", "PMO跟踪人": "秦潇", "接入轮次": "234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-057", "系统名称": "综合理财", "实施策略": "配合改造", "PMO跟踪人": "费一凡", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-058", "系统名称": "集中授权", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-059", "系统名称": "集中作业", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-060", "系统名称": "I9-估值与减值系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-061", "系统名称": "票据系统", "实施策略": "配合改造", "PMO跟踪人": "秦潇", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-062", "系统名称": "信用内部评级系统", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-063", "系统名称": "市场风险综合管理系统", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-064", "系统名称": "I16系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "34", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-065", "系统名称": "内部资金转移定价系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-066", "系统名称": "资产负债系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-067", "系统名称": "资金流平台", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-068", "系统名称": "全税种管理系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-069", "系统名称": "影像平台", "实施策略": "配合改造", "PMO跟踪人": "佟鹏飞", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-070", "系统名称": "企业服务总线", "实施策略": "配合改造", "PMO跟踪人": "佟鹏飞", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-071", "系统名称": "冠字号系统", "实施策略": "配合改造", "PMO跟踪人": "汪本高", "接入轮次": "234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-072", "系统名称": "微服务容器云平台", "实施策略": "配合改造", "PMO跟踪人": "佟鹏飞", "接入轮次": "1234", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-073", "系统名称": "资金头寸管理系统", "实施策略": "配合改造", "PMO跟踪人": "郭立杰", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 3, "序号": "XYD-074", "系统名称": "开放应用平台", "实施策略": "待定", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 3, "序号": "XYD-075", "系统名称": "域名解析系统", "实施策略": "待定", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 2, "序号": "XYD-076", "系统名称": "科技运营管理平台", "实施策略": "配合改造", "PMO跟踪人": "赵鋆益", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-077", "系统名称": "研发管理平台（DevOps）", "实施策略": "新建", "PMO跟踪人": "宋双成", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-078", "系统名称": "需求资产管理平台", "实施策略": "新建", "PMO跟踪人": "李婷", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-081", "系统名称": "数据脱敏平台", "实施策略": "新建", "PMO跟踪人": "佟鹏飞", "接入轮次": "待确认", "系统类型": "下游数据类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-082", "系统名称": "生僻字", "实施策略": "新建", "PMO跟踪人": "佟鹏飞", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 0, "序号": "XYD-106", "系统名称": "总体咨询服务", "实施策略": "服务类", "PMO跟踪人": "汪本高", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 1, "序号": "XYD-107", "系统名称": "数据治理咨询服务", "实施策略": "服务类", "PMO跟踪人": "郭立杰", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 1, "序号": "XYD-108", "系统名称": "交易级总账咨询服务", "实施策略": "服务类", "PMO跟踪人": "郭立杰", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 1, "序号": "XYD-109", "系统名称": "外聘PMO服务", "实施策略": "服务类", "PMO跟踪人": "汪本高", "接入轮次": "", "系统类型": "", "送测方式": ""},
+            {"批次": 2, "序号": "XYD-117", "系统名称": "手机银行", "实施策略": "配合改造", "PMO跟踪人": "彭帅达, 张慧", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-118", "系统名称": "信贷管理系统", "实施策略": "配合改造", "PMO跟踪人": "史廷廷", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-119", "系统名称": "积分权益平台", "实施策略": "配合改造", "PMO跟踪人": "彭帅达, 张慧", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"},
+            {"批次": 2, "序号": "XYD-121", "系统名称": "微信银行", "实施策略": "配合改造", "PMO跟踪人": "彭帅达, 张慧", "接入轮次": "待确认", "系统类型": "上游交易类", "送测方式": "全量送测"}
+        ];
+
+        let allData = [...defaultData];
+        let filteredData = [...allData];
+        let filters = { strategy: new Set(), round: new Set(), pmo: new Set() };
+        
+        let editingIndex = -1;
+        let tableSearchQuery = '';
+        let displayMode = 'all'; // 'all' 或 'first'
+
+        // 排序状态控制
+        let sortState = { key: null, desc: false };
+        const sortIdMap = {
+            '批次': 'sort_batch', '序号': 'sort_id', '系统名称': 'sort_name', '实施策略': 'sort_strategy',
+            'PMO跟踪人': 'sort_pmo', '接入轮次': 'sort_round', '系统类型': 'sort_type', '送测方式': 'sort_delivery'
+        };
+
+        const strategyClassMap = {
+            '重构': 'refactor', '新建': 'new', '拟新建': 'plan',
+            '配合改造': 'cooperate', '待定': 'pending', '服务类': 'service'
+        };
+        const roundOrder = ['SIT 第1轮', 'SIT 第2轮', 'SIT 第3轮', 'SIT 第4轮', 'SIT 第5轮', 'SIT 第6轮', 'SIT 追加轮', 'SIT 回归', '待确认', '暂不考虑', '不涉及', '未分类'];
+
+        // 核心辅助方法：解析与展示轮次与批次
+        function parseRounds(val, mode = 'all') {
+            if (!val) return ['未分类'];
+            val = String(val).trim();
+            
+            let res = [];
+            if (/^\d+$/.test(val)) {
+                res = val.split('').map(d => `SIT 第${d}轮`);
+            } else if (val.includes(',')) {
+                const parts = val.split(',').map(s => s.trim());
+                parts.forEach(p => {
+                    if (/^\d+$/.test(p)) res.push(...p.split('').map(d => `SIT 第${d}轮`));
+                    else if (p) {
+                        if (p.startsWith('SIT ')) res.push(p);
+                        else if (p === '待确认' || p === '暂不考虑' || p === '不涉及') res.push(p);
+                        else res.push(`SIT ${p}`);
+                    }
+                });
+            } else {
+                if (val.startsWith('SIT ')) res = [val];
+                else if (val === '待确认' || val === '暂不考虑' || val === '不涉及') res = [val];
+                else res = [`SIT ${val}`];
+            }
+
+            if (res.length === 0) return ['未分类'];
+
+            if (mode === 'first' && res.length > 1) {
+                const digitRounds = res.filter(r => r.includes('第') && r.includes('轮'));
+                if (digitRounds.length > 0) {
+                    digitRounds.sort((a, b) => {
+                        const numA = parseInt(a.replace(/[^0-9]/g, ''));
+                        const numB = parseInt(b.replace(/[^0-9]/g, ''));
+                        return numA - numB;
+                    });
+                    return [digitRounds[0]];
+                }
+                return [res[0]];
+            }
+            return res;
+        }
+
+        function formatRoundDisplay(val) {
+            if (!val) return '-';
+            val = String(val).trim();
+            if (/^\d+$/.test(val)) return `SIT ${val}轮`;
+            if (val.startsWith('SIT ')) return val;
+            if (val === '待确认' || val === '暂不考虑' || val === '不涉及') return val;
+            return `SIT ${val}`;
+        }
+
+        function formatBatch(val) {
+            if (val === '' || val === null || val === undefined) return '-';
+            const f = parseFloat(val);
+            if (!isNaN(f)) return f.toFixed(1);
+            return val;
+        }
+
+        function init() {
+            refreshDataAndViews();
+            setupDragAndDrop();
+        }
+
+        function handleDisplayModeChange() {
+            displayMode = document.querySelector('input[name="display_mode"]:checked').value;
+            refreshDataAndViews();
+        }
+
+        function refreshDataAndViews() {
+            updateFilters();
+            applyFilters();
+            renderStats();
+            renderMatrix();
+            renderTable();
+            document.getElementById('tableDataCount').textContent = `共 ${allData.length} 条数据`;
+        }
+
+        function switchView(viewType) {
+            const dataView = document.getElementById('dataViewContainer');
+            const formView = document.getElementById('formViewContainer');
+            const btnData = document.getElementById('btnDataView');
+            const btnForm = document.getElementById('btnFormView');
+
+            if (viewType === 'data') {
+                dataView.style.display = 'block';
+                formView.style.display = 'none';
+                btnData.classList.add('active');
+                btnForm.classList.remove('active');
+                refreshDataAndViews();
+            } else {
+                dataView.style.display = 'none';
+                formView.style.display = 'block';
+                btnForm.classList.add('active');
+                btnData.classList.remove('active');
+                renderTable();
+            }
+        }
+
+        // ---------- 表单视图功能与排序 ----------
+        function handleTableSearch() {
+            tableSearchQuery = document.getElementById('tableSearchInput').value.trim();
+            renderTable();
+        }
+
+        function handleSort(key) {
+            if (sortState.key === key) {
+                if (sortState.desc) { sortState.key = null; sortState.desc = false; } 
+                else { sortState.desc = true; }
+            } else {
+                sortState.key = key;
+                sortState.desc = false;
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('formTableBody');
+            const mappedData = allData.map((item, index) => ({ item, index }));
+            
+            let displayData = mappedData.filter(obj => {
+                const searchStr = tableSearchQuery.toLowerCase();
+                return (obj.item['系统名称'] || '').toLowerCase().includes(searchStr) || 
+                       (obj.item['序号'] || '').toLowerCase().includes(searchStr);
+            });
+
+            Object.values(sortIdMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.innerHTML = '↕'; el.classList.remove('active'); }
+            });
+
+            if (sortState.key) {
+                const el = document.getElementById(sortIdMap[sortState.key]);
+                if (el) { el.innerHTML = sortState.desc ? '↓' : '↑'; el.classList.add('active'); }
+
+                displayData.sort((a, b) => {
+                    let valA = a.item[sortState.key]; let valB = b.item[sortState.key];
+                    valA = valA !== undefined && valA !== null ? String(valA) : '';
+                    valB = valB !== undefined && valB !== null ? String(valB) : '';
+
+                    let numA = parseFloat(valA); let numB = parseFloat(valB);
+                    let isNumA = !isNaN(numA) && valA.trim() !== '';
+                    let isNumB = !isNaN(numB) && valB.trim() !== '';
+
+                    if (isNumA && isNumB) {
+                        if (numA < numB) return sortState.desc ? 1 : -1;
+                        if (numA > numB) return sortState.desc ? -1 : 1;
+                    } else {
+                        let sA = valA.toLowerCase(); let sB = valB.toLowerCase();
+                        if (sA < sB) return sortState.desc ? 1 : -1;
+                        if (sA > sB) return sortState.desc ? -1 : 1;
+                    }
+                    return 0;
+                });
+            }
+
+            if (displayData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#9ca3af; padding:32px;">暂无匹配数据</td></tr>`;
+                return;
+            }
+
+            const multiSelectOptions = [
+                { value: '1', label: '1轮' }, { value: '2', label: '2轮' }, { value: '3', label: '3轮' }, 
+                { value: '4', label: '4轮' }, { value: '5', label: '5轮' }, { value: '6', label: '6轮' },
+                { value: '追加轮', label: '追加轮' }, { value: '回归', label: '回归' },
+                { value: '待确认', label: '待确认' }, { value: '暂不考虑', label: '暂不考虑' }, { value: '不涉及', label: '不涉及' }
+            ];
+
+            tbody.innerHTML = displayData.map(obj => {
+                const item = obj.item;
+                const index = obj.index;
+                
+                if (index === editingIndex) {
+                    let currentRounds = [];
+                    let rv = String(item['接入轮次']||'').trim();
+                    rv = rv.replace(/SIT /g, '');
+
+                    if (/^\d+$/.test(rv)) currentRounds = rv.split('');
+                    else if (rv) currentRounds = rv.split(',').map(s=>s.trim());
+
+                    let roundHtml = `<div class="multi-select-container">`;
+                    multiSelectOptions.forEach(opt => {
+                        const isChecked = currentRounds.includes(opt.value) ? 'checked' : '';
+                        roundHtml += `<label class="multi-select-label"><input type="checkbox" name="edit_round_cb" value="${opt.value}" ${isChecked}> ${opt.label}</label>`;
+                    });
+                    roundHtml += `</div>`;
+
+                    return `
+                        <tr>
+                            <td><input type="text" class="edit-input" id="edit_batch" value="${item['批次'] !== undefined ? item['批次'] : ''}"></td>
+                            <td><input type="text" class="edit-input" id="edit_id" value="${item['序号'] || ''}" placeholder="编号"></td>
+                            <td><input type="text" class="edit-input" id="edit_name" value="${item['系统名称'] || ''}" placeholder="名称必填"></td>
+                            <td><input type="text" class="edit-input" id="edit_strategy" value="${item['实施策略'] || ''}"></td>
+                            <td><input type="text" class="edit-input" id="edit_pmo" value="${item['PMO跟踪人'] || ''}"></td>
+                            <td>${roundHtml}</td>
+                            <td><input type="text" class="edit-input" id="edit_type" value="${item['系统类型'] || ''}"></td>
+                            <td><input type="text" class="edit-input" id="edit_delivery" value="${item['送测方式'] || ''}"></td>
+                            <td>
+                                <button class="row-action-btn save" onclick="saveRow(${index})">保存</button>
+                                <button class="row-action-btn cancel" onclick="cancelEdit()">取消</button>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    return `
+                        <tr>
+                            <td>${formatBatch(item['批次'])}</td>
+                            <td>${item['序号'] || '-'}</td>
+                            <td>${item['系统名称'] || '-'}</td>
+                            <td>${item['实施策略'] || '-'}</td>
+                            <td>${item['PMO跟踪人'] || '-'}</td>
+                            <td>${formatRoundDisplay(item['接入轮次'])}</td>
+                            <td>${item['系统类型'] || '-'}</td>
+                            <td>${item['送测方式'] || '-'}</td>
+                            <td>
+                                <button class="row-action-btn edit" onclick="editRow(${index})">编辑</button>
+                                <button class="row-action-btn delete" onclick="deleteRow(${index})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            }).join('');
+        }
+
+        function addNewRow() {
+            if (editingIndex !== -1) { alert("请先保存当前编辑"); return; }
+            const newItem = { "批次": "", "序号": "", "系统名称": "", "实施策略": "", "PMO跟踪人": "", "接入轮次": "", "系统类型": "", "送测方式": "" };
+            allData.unshift(newItem);
+            editingIndex = 0;
+            document.getElementById('tableSearchInput').value = '';
+            tableSearchQuery = ''; 
+            renderTable();
+        }
+
+        function editRow(index) {
+            if (editingIndex !== -1) { alert("请先保存当前编辑"); return; }
+            editingIndex = index;
+            renderTable();
+        }
+
+        function cancelEdit() {
+            if (editingIndex !== -1 && !allData[editingIndex]['系统名称'].trim()) allData.splice(editingIndex, 1);
+            editingIndex = -1;
+            renderTable();
+        }
+
+        function saveRow(index) {
+            const nameInput = document.getElementById('edit_name').value.trim();
+            if (!nameInput) { alert("系统名称不能为空"); return; }
+
+            const checkedCbs = document.querySelectorAll('input[name="edit_round_cb"]:checked');
+            let selectedValues = Array.from(checkedCbs).map(cb => cb.value);
+            let finalRoundValue = '';
+            const digitValues = selectedValues.filter(v => /^\d$/.test(v)).sort();
+            const textValues = selectedValues.filter(v => !/^\d$/.test(v));
+
+            if (digitValues.length > 0 && textValues.length > 0) finalRoundValue = digitValues.join('') + ',' + textValues.join(',');
+            else if (digitValues.length > 0) finalRoundValue = digitValues.join('');
+            else if (textValues.length > 0) finalRoundValue = textValues.join(',');
+
+            allData[index] = {
+                '批次': document.getElementById('edit_batch').value.trim(),
+                '序号': document.getElementById('edit_id').value.trim(),
+                '系统名称': nameInput,
+                '实施策略': document.getElementById('edit_strategy').value.trim(),
+                'PMO跟踪人': document.getElementById('edit_pmo').value.trim(),
+                '接入轮次': finalRoundValue,
+                '系统类型': document.getElementById('edit_type').value.trim(),
+                '送测方式': document.getElementById('edit_delivery').value.trim()
+            };
+            editingIndex = -1;
+            refreshDataAndViews();
+        }
+
+        function deleteRow(index) {
+            if (confirm(`确定要删除【${allData[index]['系统名称']}】吗？`)) {
+                allData.splice(index, 1);
+                refreshDataAndViews();
+            }
+        }
+
+        // ---------- 数据视图功能 ----------
+        function updateFilters() {
+            const roundSet = new Set();
+            allData.forEach(item => { parseRounds(item['接入轮次'], displayMode).forEach(r => roundSet.add(r)); });
+            
+            const rounds = [...roundSet];
+            rounds.sort((a, b) => {
+                const idxA = roundOrder.indexOf(a); const idxB = roundOrder.indexOf(b);
+                if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                return idxA === -1 ? 1 : (idxB === -1 ? -1 : idxA - idxB);
+            });
+            document.getElementById('roundFilters').innerHTML = rounds.map(round => 
+                `<span class="filter-tag" onclick="toggleFilter('round', '${round}', this)">${round}</span>`
+            ).join('');
+
+            const pmoSet = new Set();
+            allData.forEach(item => { if (item['PMO跟踪人']) item['PMO跟踪人'].split(',').forEach(p => pmoSet.add(p.trim())); });
+            document.getElementById('pmoDropdown').innerHTML = [...pmoSet].sort().filter(Boolean).map(pmo => 
+                `<div class="filter-dropdown-item" onclick="togglePMOFilter('${pmo}', this)">
+                    <input type="checkbox" id="pmo_${pmo}"> <label for="pmo_${pmo}">${pmo}</label>
+                </div>`
+            ).join('');
+        }
+
+        function applyFilters() {
+            filteredData = allData.filter(item => {
+                if (filters.strategy.size > 0 && !filters.strategy.has(item['实施策略'])) return false;
+                if (filters.round.size > 0) {
+                    const itemRounds = parseRounds(item['接入轮次'], displayMode);
+                    if (!itemRounds.some(r => filters.round.has(r))) return false;
+                }
+                if (filters.pmo.size > 0) {
+                    const itemPMOs = item['PMO跟踪人'] ? item['PMO跟踪人'].split(',').map(p => p.trim()) : [];
+                    if (!itemPMOs.some(p => filters.pmo.has(p))) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderStats() {
+            const dataForChart = allData.filter(item => {
+                if (filters.round.size > 0) {
+                    const itemRounds = parseRounds(item['接入轮次'], displayMode);
+                    if (!itemRounds.some(r => filters.round.has(r))) return false;
+                }
+                if (filters.pmo.size > 0) {
+                    const itemPMOs = item['PMO跟踪人'] ? item['PMO跟踪人'].split(',').map(p => p.trim()) : [];
+                    if (!itemPMOs.some(p => filters.pmo.has(p))) return false;
+                }
+                return true;
+            });
+
+            const strategyCounts = {};
+            dataForChart.forEach(item => {
+                const s = item['实施策略'] || '未知';
+                strategyCounts[s] = (strategyCounts[s] || 0) + 1;
+            });
+            
+            const strategies = ['重构', '新建', '拟新建', '配合改造', '待定', '服务类'];
+            const maxCount = Math.max(...strategies.map(s => strategyCounts[s] || 0), 1);
+            
+            document.getElementById('strategyChart').innerHTML = strategies.map(s => {
+                const count = strategyCounts[s] || 0;
+                const heightPercent = count === 0 ? 0 : Math.max(5, (count / maxCount) * 100);
+                
+                const cls = strategyClassMap[s] || 'pending';
+                const isActive = filters.strategy.has(s);
+                const isDimmed = filters.strategy.size > 0 && !isActive;
+                const opacity = isDimmed ? '0.2' : '1';
+                const transform = isActive ? 'scale(1.05)' : 'scale(1)';
+                const border = isActive ? `border: 2px solid var(--text-primary); border-bottom: none;` : '';
+
+                return `
+                    <div class="strategy-bar" style="opacity: ${opacity}; transform: ${transform};" onclick="toggleStrategyFromChart('${s}')">
+                        <div class="strategy-bar-value">${count}</div>
+                        <div class="strategy-bar-track">
+                            <div class="strategy-bar-fill" style="height: ${heightPercent}%; background: var(--color-${cls}); ${border}"></div>
+                        </div>
+                        <div class="strategy-bar-label" style="font-weight: ${isActive ? '700' : '500'}">${s}</div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('totalSystems').innerHTML = `${filteredData.length} <span>个</span>`;
+            
+            // 核心修改 1：剔除待确认、不涉及等无意义状态，净化计数的独立轮次数
+            const dynamicRoundSet = new Set();
+            filteredData.forEach(item => {
+                parseRounds(item['接入轮次'], displayMode).forEach(r => {
+                    if (/(第\d轮|回归|追加)/.test(r)) {
+                        dynamicRoundSet.add(r);
+                    }
+                });
+            });
+            document.getElementById('totalRounds').innerHTML = `${dynamicRoundSet.size} <span>轮</span>`;
+            
+            const finalPMOSet = new Set();
+            filteredData.forEach(item => { if (item['PMO跟踪人']) item['PMO跟踪人'].split(',').forEach(p => finalPMOSet.add(p.trim())); });
+            document.getElementById('totalPMOs').innerHTML = `${[...finalPMOSet].filter(Boolean).length} <span>人</span>`;
+        }
+
+        function toggleStrategyFromChart(strategy) {
+            const tagEl = document.querySelector(`.filter-tag[data-strategy="${strategy}"]`);
+            if (tagEl) {
+                toggleFilter('strategy', strategy, tagEl);
+            } else {
+                if (filters.strategy.has(strategy)) filters.strategy.delete(strategy);
+                else filters.strategy.add(strategy);
+                applyFilters(); renderStats(); renderMatrix();
+            }
+        }
+
+        function renderMatrix() {
+            const matrixEl = document.getElementById('matrixSection');
+            if (filteredData.length === 0) {
+                matrixEl.innerHTML = `<div class="round-card" style="column-span: all;"><div class="empty-state"><p>没有找到匹配的系统模块</p></div></div>`;
+                return;
+            }
+
+            const groups = {};
+            filteredData.forEach(item => {
+                const rounds = parseRounds(item['接入轮次'], displayMode);
+                rounds.forEach(round => {
+                    if (filters.round.size > 0 && !filters.round.has(round)) return;
+                    if (!groups[round]) groups[round] = [];
+                    groups[round].push(item);
+                });
+            });
+            
+            const sortedRounds = Object.keys(groups).sort((a, b) => {
+                const idxA = roundOrder.indexOf(a); const idxB = roundOrder.indexOf(b);
+                if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                return idxA === -1 ? 1 : (idxB === -1 ? -1 : idxA - idxB);
+            });
+
+            matrixEl.innerHTML = sortedRounds.map((round, idx) => {
+                const items = groups[round];
+                return `
+                    <div class="round-card">
+                        <div class="round-card-header">
+                            <div class="round-title">${round}</div>
+                            <div class="round-count">${items.length} 个</div>
+                        </div>
+                        <div class="system-grid">
+                            ${items.map(item => {
+                                const cls = strategyClassMap[item['实施策略']] || 'pending';
+                                return `
+                                    <div class="system-card ${cls}" onmouseenter="showTooltip(event, this)" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()" onclick="showDetail('${item['序号']}')" 
+                                        data-id="${item['序号']}" 
+                                        data-strategy="${item['实施策略'] || '-'}" 
+                                        data-pmo="${item['PMO跟踪人'] || '-'}" 
+                                        data-type="${item['系统类型'] || '-'}">
+                                        <div class="system-name" title="${item['系统名称']}">${item['系统名称']}</div>
+                                    </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function toggleFilter(type, value, el) {
+            if (filters[type].has(value)) { filters[type].delete(value); el.classList.remove('active'); } 
+            else { filters[type].add(value); el.classList.add('active'); }
+            applyFilters(); renderStats(); renderMatrix();
+        }
+
+        function togglePMODropdown() { document.getElementById('pmoDropdown').classList.toggle('show'); }
+        function togglePMOFilter(pmo, el) {
+            const checkbox = el.querySelector('input');
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) filters.pmo.add(pmo); else filters.pmo.delete(pmo);
+            document.getElementById('pmoSelectedText').textContent = filters.pmo.size === 0 ? '全部' : `已选 ${filters.pmo.size} 人`;
+            applyFilters(); renderStats(); renderMatrix();
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.filter-select')) document.getElementById('pmoDropdown').classList.remove('show');
+        });
+
+        function clearAllFilters() {
+            filters.strategy.clear(); filters.round.clear(); filters.pmo.clear();
+            document.querySelectorAll('.filter-tag.active').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#pmoDropdown input').forEach(el => el.checked = false);
+            document.getElementById('pmoSelectedText').textContent = '全部';
+            applyFilters(); renderStats(); renderMatrix();
+        }
+
+        function showTooltip(event, el) {
+            const t = document.getElementById('tooltip');
+            document.getElementById('tooltipId').textContent = el.dataset.id;
+            document.getElementById('tooltipStrategy').textContent = el.dataset.strategy;
+            document.getElementById('tooltipPMO').textContent = el.dataset.pmo;
+            document.getElementById('tooltipType').textContent = el.dataset.type;
+            
+            const rawItem = allData.find(d => d['序号'] === el.dataset.id);
+            document.getElementById('tooltipRound').textContent = rawItem ? formatRoundDisplay(rawItem['接入轮次']) : '-';
+
+            t.classList.add('show'); moveTooltip(event);
+        }
+        function moveTooltip(event) {
+            const t = document.getElementById('tooltip');
+            let x = event.clientX + 16, y = event.clientY + 16;
+            const r = t.getBoundingClientRect();
+            if (x + r.width > window.innerWidth) x = event.clientX - r.width - 16;
+            if (y + r.height > window.innerHeight) y = event.clientY - r.height - 16;
+            t.style.left = x + 'px'; t.style.top = y + 'px';
+        }
+        function hideTooltip() { document.getElementById('tooltip').classList.remove('show'); }
+
+        function showDetail(id) {
+            const item = allData.find(d => d['序号'] === id);
+            if (!item) return;
+            const cls = strategyClassMap[item['实施策略']] || 'pending';
+            document.getElementById('modalTitle').textContent = item['系统名称'];
+            document.getElementById('modalContent').innerHTML = `
+                <div class="modal-detail-row"><span class="modal-detail-label">批次</span><span class="modal-detail-value">${formatBatch(item['批次'])}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">系统编号</span><span class="modal-detail-value">${item['序号']}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">实施策略</span><span class="modal-detail-value" style="color: var(--color-${cls}); font-weight:700;">${item['实施策略'] || '-'}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">PMO跟踪人</span><span class="modal-detail-value">${item['PMO跟踪人'] || '-'}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">接入轮次</span><span class="modal-detail-value">${formatRoundDisplay(item['接入轮次'])}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">系统类型</span><span class="modal-detail-value">${item['系统类型'] || '-'}</span></div>
+                <div class="modal-detail-row"><span class="modal-detail-label">送测方式</span><span class="modal-detail-value">${item['送测方式'] || '-'}</span></div>
+            `;
+            document.getElementById('modalOverlay').classList.add('show');
+        }
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('show');
+        }
+
+        // ---------- Excel 文件上传与数据刷新打通 ----------
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) processExcelFile(file);
+        }
+
+        function parseRawRound(val) {
+            if (val === undefined || val === null || val === '') return '';
+            let s = String(val).trim();
+            if (/^\d+\.0$/.test(s)) s = s.replace('.0', '');
+            return s;
+        }
+
+        function parseRawBatch(val) {
+            if (val === undefined || val === null || val === '') return '';
+            let s = String(val).trim();
+            if (/^\d+\.0$/.test(s)) s = s.replace('.0', '');
+            return s;
+        }
+
+        function processExcelFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    let headerRowIndex = -1;
+                    for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+                        if (jsonData[i].some(cell => cell && String(cell).includes('系统名称'))) { headerRowIndex = i; break; }
+                    }
+
+                    if (headerRowIndex === -1) { alert('未找到表头，请确保Excel包含"系统名称"列'); return; }
+
+                    const headers = jsonData[headerRowIndex].map(h => h ? String(h).trim() : '');
+                    
+                    const colIndex = {
+                        batch: findColumnIndex(headers, ['批次']),
+                        id: findColumnIndex(headers, ['序号', '编号']),
+                        name: findColumnIndex(headers, ['系统名称', '名称']),
+                        strategy: findColumnIndex(headers, ['实施策略', '策略']),
+                        pmo: findColumnIndex(headers, ['PMO跟踪人', 'PMO', '跟踪人', '负责人']),
+                        round: findColumnIndex(headers, ['SIT轮次', '接入轮次', '轮次']),
+                        type: findColumnIndex(headers, ['系统类型', '类型']),
+                        delivery: findColumnIndex(headers, ['送测方式', '送测'])
+                    };
+
+                    const newData = [];
+                    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || !row[colIndex.name]) continue;
+                        newData.push({
+                            '批次': colIndex.batch >= 0 ? parseRawBatch(row[colIndex.batch]) : '',
+                            '序号': colIndex.id >= 0 ? (row[colIndex.id] || '') : `SYS-${String(newData.length + 1).padStart(3, '0')}`,
+                            '系统名称': String(row[colIndex.name] || '').trim(),
+                            '实施策略': colIndex.strategy >= 0 ? (row[colIndex.strategy] || '') : '',
+                            'PMO跟踪人': colIndex.pmo >= 0 ? (row[colIndex.pmo] || '') : '',
+                            '接入轮次': colIndex.round >= 0 ? parseRawRound(row[colIndex.round]) : '待确认',
+                            '系统类型': colIndex.type >= 0 ? (row[colIndex.type] || '') : '',
+                            '送测方式': colIndex.delivery >= 0 ? (row[colIndex.delivery] || '') : ''
+                        });
+                    }
+
+                    allData = newData;
+                    
+                    filters.strategy.clear(); 
+                    filters.round.clear(); 
+                    filters.pmo.clear();
+                    document.querySelectorAll('.filter-tag.active').forEach(el => el.classList.remove('active'));
+                    document.querySelectorAll('#pmoDropdown input').forEach(el => el.checked = false);
+                    document.getElementById('pmoSelectedText').textContent = '全部';
+                    
+                    refreshDataAndViews(); 
+
+                    document.getElementById('uploadHint').classList.remove('show');
+                    alert(`✅ 成功导入 ${newData.length} 个系统模块数据！\n数据已完全同步至数据视图与表单视图。`);
+                } catch (error) {
+                    alert('解析Excel失败：' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = ''; // 保证下次传同一个文件也能触发onchange
+        }
+
+        function findColumnIndex(headers, keywords) {
+            for (let i = 0; i < headers.length; i++) if (keywords.some(kw => headers[i].includes(kw))) return i;
+            return -1;
+        }
+
+        function setupDragAndDrop() {
+            const uploadHint = document.getElementById('uploadHint');
+            const uploadHintBox = document.getElementById('uploadHintBox');
+            let dragCounter = 0;
+            document.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; if (e.dataTransfer.types.includes('Files')) uploadHint.classList.add('show'); });
+            document.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) { uploadHint.classList.remove('show'); uploadHintBox.classList.remove('dragover'); } });
+            document.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer.types.includes('Files')) uploadHintBox.classList.add('dragover'); });
+            document.addEventListener('drop', (e) => {
+                e.preventDefault(); dragCounter = 0; uploadHint.classList.remove('show'); uploadHintBox.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) processExcelFile(file);
+                    else alert('请上传Excel文件（.xlsx / .xls）');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); document.getElementById('pmoDropdown').classList.remove('show'); } });
+        
+        init();
+    </script>
+</body>
+</html>
